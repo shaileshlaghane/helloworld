@@ -1,0 +1,59 @@
+pipeline {
+	agent any
+	stages {
+		stage ('SCM checkout') {
+			steps {
+			git credentialsId: 'gitcredential', url: 'https://github.com/shaileshlaghane/helloworld.git'
+			}
+		}
+		stage ('User creation and package installation using Ansible') {
+		    steps {
+		        sh 'ansible-playbook /root/assignment_ansi.yml'
+		    }
+		}
+		stage ('Build Package') {
+		    steps {
+		    sh '/usr/share/maven/bin/mvn -X -e clean install dockerfile:build'    
+		    }
+		}
+		stage ('Push docker image') {
+		    steps {
+		        withCredentials([string(credentialsId: 'dockGMJDK', variable: 'dokcerhubc')]) {
+                sh "docker login -u shaileshlaghane -p ${dokcerhubc}"    
+                        }
+            sh 'docker push shaileshlaghane/helloworld:latest'            
+		    }
+		}
+		stage ('Deploy over K8s') {
+		    steps {
+		        sshagent(['ubappmontoring']) {
+		            sh "ssh -o StrictHostKeyChecking=no ubuntu@172.31.39.173 <<EOF
+		            cat <<eof> /tmp/assignment.yml
+		            apiVersion: apps/v1
+                    kind: Deployment
+                    metadata:
+                      name: assignment-deployment
+                    spec:
+                      replicas: 2
+                      selector:
+                        matchLabels:
+                          app: assignment
+                      template:
+                        metadata:
+                          labels:
+                            app: assignment
+                        spec:
+                          containers:
+                          - name: k8s-assignment
+                            image: shaileshlaghane/helloworld
+                            ports:
+                            - name: testport
+                              containerPort: 80
+                    eof
+                    kubectl create -f /tmp/assignment.yml
+                    EOF"
+		        }
+		    }
+		}
+	}
+}

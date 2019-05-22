@@ -1,0 +1,22 @@
+---
+- hosts: localhost
+  become: true
+  tasks:
+  - name: Install Docker and Maven
+    apt: name=docker.io state=present
+    apt: name=maven state=present
+    register: p1
+  - name: Start the docker
+    service: name=docker state=running
+    register: p2
+  - name: Create Developer account
+    user:
+      name: developer
+      groups: docker
+    register: p3
+  - debug:
+      msg: "{{ p1 }}"
+  - debug:
+      msg: "{{ p2 }}"
+  - debug:
+      msg: "{{ p3 }}"
